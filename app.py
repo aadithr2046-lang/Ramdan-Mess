@@ -22,11 +22,11 @@ mysql_pool = pooling.MySQLConnectionPool(
     pool_name="mypool",
     pool_size=5,
     pool_reset_session=True,
-    host="hopper.proxy.rlwy.net",  # ✅ RDS endpoint
+    host="mainline.proxy.rlwy.net",  # ✅ RDS endpoint
     database="mess_app",
-    port = 46552 , #  ✅ your database name
+    port = 12553 , #  ✅ your database name
     user="root",          # ✅ your RDS username
-    password="TlTTiFmIpCerhlXGBzRrEMmznxidkjgU"   # ✅ your RDS password
+    password="JmiJwZMzBQQUnVbnLPaFRkldruOGLeLL"   # ✅ your RDS password
 )
 
 
@@ -1432,6 +1432,104 @@ def admin_qr_count():
         counts_by_date=sorted_counts
     )
 
+from datetime import date, datetime, time, timedelta
+
+from datetime import date, datetime, timedelta, time
+
+@app.route('/skip_meal', methods=['GET', 'POST'])
+@login_required
+def skip_meal():
+    today = date.today()
+    now = datetime.now()
+    min_date = (today + timedelta(days=1)).strftime('%Y-%m-%d')
+
+    if request.method == 'POST':
+        meal_type = request.form.get('meal_type')  # athaayam / ifthaar
+        skip_date = request.form.get('skip_date')
+        reason = request.form.get('reason', None)
+
+        if meal_type not in ['athaayam', 'ifthaar']:
+            flash("Invalid meal type", "danger")
+            return redirect(url_for('skip_meal'))
+
+        skip_date = datetime.strptime(skip_date, "%Y-%m-%d").date()
+
+        # ❌ Past date check
+        if skip_date <= today:
+            flash("You can only apply mess skip for future dates.", "warning")
+            return redirect(url_for('skip_meal'))
+
+        # ⏰ 10 PM previous day cutoff
+        cutoff_datetime = datetime.combine(
+            skip_date - timedelta(days=1),
+            time(22, 0)  # 10:00 PM
+        )
+
+        if now > cutoff_datetime:
+            flash(
+                "Mess skip must be applied before 10:00 PM of the previous day.",
+                "warning"
+            )
+            return redirect(url_for('skip_meal'))
+
+        conn = mysql_pool.get_connection()
+        cur = conn.cursor(dictionary=True)
+
+        try:
+            # 🚫 Check mess cut
+            cur.execute("""
+                SELECT id
+                FROM mess_cut
+                WHERE user_id = %s
+                  AND %s BETWEEN from_date AND to_date
+            """, (current_user.id, skip_date))
+
+            if cur.fetchone():
+                flash(
+                    "You already have a mess cut on this date. Mess skip not allowed.",
+                    "warning"
+                )
+                return redirect(url_for('skip_meal'))
+
+            # 🚫 Check existing mess skip (same day)
+            cur.execute("""
+                SELECT id
+                FROM meal_skip
+                WHERE user_id = %s
+                  AND skip_date = %s
+            """, (current_user.id, skip_date))
+
+            if cur.fetchone():
+                flash(
+                    "You have already applied a mess skip for this date.",
+                    "info"
+                )
+                return redirect(url_for('skip_meal'))
+
+            # ✅ Insert mess skip
+            cur.execute("""
+                INSERT INTO meal_skip (user_id, skip_date, meal_type, reason)
+                VALUES (%s, %s, %s, %s)
+            """, (current_user.id, skip_date, meal_type, reason))
+
+            conn.commit()
+            flash("Mess skip applied successfully!", "success")
+
+        except Exception as e:
+            conn.rollback()
+            flash("Unable to apply mess skip. Please try again.", "danger")
+
+        finally:
+            cur.close()
+            conn.close()
+
+        return redirect(url_for('skip_meal'))
+
+    # ✅ GET request
+    return render_template("skip_meal.html", min_date=min_date)
+
+
+    
 
 
 from flask import jsonify, request
@@ -1647,6 +1745,65 @@ def users_meal_counts():
         if cur: cur.close()
         if conn: conn.close()
 
+@app.route('/admin/mess_skips')
+@login_required
+def admin_mess_skips():
+    if not getattr(current_user, 'is_admin', False):
+        flash("Unauthorized access", "danger")
+        return redirect(url_for('user_dashboard'))
+
+    tomorrow = date.today() + timedelta(days=1)
+
+    conn = mysql_pool.get_connection()
+    cur = conn.cursor(dictionary=True)
+
+    try:
+        # 🔹 All skips (latest first)
+        cur.execute("""
+            SELECT ms.id,
+                   u.name,
+                   u.course,
+                   ms.skip_date,
+                   ms.meal_type,
+                   ms.reason,
+                   ms.applied_at
+            FROM meal_skip ms
+            JOIN users u ON u.id = ms.user_id
+            ORDER BY ms.skip_date DESC, ms.meal_type
+        """)
+        all_skips = cur.fetchall()
+
+        # 🔹 Tomorrow counts
+        cur.execute("""
+            SELECT meal_type, COUNT(*) AS total
+            FROM meal_skip
+            WHERE skip_date = %s
+            GROUP BY meal_type
+        """, (tomorrow,))
+        raw_counts = cur.fetchall()
+
+        tomorrow_counts = {
+            "athaayam": 0,
+            "ifthaar": 0
+        }
+        for r in raw_counts:
+            tomorrow_counts[r['meal_type']] = r['total']
+
+    except Exception as e:
+        flash(f"Database error: {e}", "danger")
+        all_skips = []
+        tomorrow_counts = {"athaayam": 0, "ifthaar": 0}
+
+    finally:
+        cur.close()
+        conn.close()
+
+    return render_template(
+        "admin_mess_skips.html",
+        all_skips=all_skips,
+        tomorrow=tomorrow.strftime("%d-%m-%Y"),
+        tomorrow_counts=tomorrow_counts
+    )
 
 
 # ---------------- ADMIN: Add mess cut for any user ----------------

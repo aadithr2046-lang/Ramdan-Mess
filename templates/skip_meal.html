@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+
+<form method="POST" class="card p-4 shadow-sm rounded-4">
+
+  <h5 class="fw-bold mb-3 text-center">🍽️ Apply Mess Skip</h5>
+
+  <!-- Meal Type -->
+  <label class="fw-bold">Select Meal</label>
+  <select name="meal_type" class="form-select" required>
+    <option value="" disabled selected>Select meal</option>
+    <option value="athaayam">Athaayam</option>
+    <option value="ifthaar">Iftaar</option>
+  </select>
+
+  <!-- Skip Date -->
+  <label class="fw-bold mt-3">Select Date</label>
+  <input
+    type="date"
+    name="skip_date"
+    class="form-control"
+    required
+    min="{{ min_date }}"
+  >
+
+  <!-- Info -->
+  <div class="alert alert-info mt-3 small rounded-3">
+    <ul class="mb-0 ps-3">
+      <li>Mess skip is allowed only for <strong>future dates</strong>.</li>
+      <li>Apply <strong>before 10:00 PM</strong> of the previous day.</li>
+      <li>Mess skip is <strong>not allowed</strong> if a mess cut exists.</li>
+      <li>Only <strong>one mess skip per day</strong> is allowed.</li>
+    </ul>
+  </div>
+
+  <!-- Submit -->
+  <button class="btn btn-warning fw-bold mt-3 w-100">
+    Apply Meal Skip
+  </button>
+
+</form>
+
+{% endblock %}

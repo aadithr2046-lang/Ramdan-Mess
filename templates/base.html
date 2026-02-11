@@ -132,6 +132,7 @@
                 <a href="{{ url_for('users_list') }}">Users</a>
                 <a href="{{ url_for('new_users_list') }}">New Users</a>
                 <a href="{{ url_for('mess_cut_list') }}">Mess Cuts</a>
+		    <a href="{{ url_for('admin_mess_skips') }}">Mess Skip</a>
                 <a href="{{ url_for('late_mess_list') }}">Late Mess</a>
                 <a href="{{ url_for('generate_bills') }}">Generate Bills</a>
                 <a href="{{ url_for('mess_menu') }}">Mess Menu</a>
@@ -140,7 +141,9 @@
                 <a href="{{ url_for('user_dashboard') }}">Dashboard</a>
                 <a href="{{ url_for('my_qr') }}">My QR</a>
                 <a href="{{ url_for('my_mess_cuts') }}">My Mess Cuts</a>
+		    <a href="{{ url_for('skip_meal') }}">Mess Skip</a>
                 <a href="{{ url_for('mess_menu') }}">Mess Menu</a>
+		    
             {% endif %}
 
             <a href="{{ url_for('logout') }}">Logout</a>

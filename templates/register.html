@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Register</title>
   <script src="https://cdn.tailwindcss.com"></script>
+
   <style>
     body {
       font-family: 'Roboto', sans-serif;
@@ -21,14 +22,16 @@
       padding: 2rem;
       border-radius: 1rem;
       width: 100%;
-      max-width: 24rem;
+      max-width: 26rem;
       box-shadow: 0 10px 25px rgba(0,0,0,0.15);
     }
     .input-field {
       position: relative;
       margin-bottom: 1.5rem;
     }
-    .input-field input, .input-field select {
+    .input-field input,
+    .input-field select,
+    .input-field textarea {
       width: 100%;
       padding: 14px;
       border-radius: 0.5rem;
@@ -36,6 +39,7 @@
       outline: none;
       transition: border 0.3s;
       font-size: 1rem;
+      background: white;
     }
     .input-field label {
       position: absolute;
@@ -52,7 +56,9 @@
     .input-field input:focus + label,
     .input-field input:not(:placeholder-shown) + label,
     .input-field select:focus + label,
-    .input-field select:not([value=""]) + label {
+    .input-field select:not([value=""]) + label,
+    .input-field textarea:focus + label,
+    .input-field textarea:not(:placeholder-shown) + label {
       top: -8px;
       left: 8px;
       font-size: 0.75rem;
@@ -68,25 +74,9 @@
     }
     .flash-success { background-color: #27ae60; color: white; }
     .flash-danger { background-color: #e74c3c; color: white; }
-
-    @media (max-width: 400px) {
-      .card {
-        padding: 1.5rem;
-      }
-      .input-field input, .input-field select {
-        padding: 12px;
-        font-size: 0.95rem;
-      }
-      .input-field label {
-        font-size: 0.9rem;
-      }
-      button {
-        padding: 12px;
-        font-size: 0.95rem;
-      }
-    }
   </style>
 </head>
+
 <body>
   <div class="card">
     <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">Register</h2>
@@ -101,9 +91,10 @@
     {% endwith %}
 
     <form method="POST" action="{{ url_for('register') }}">
+
       <div class="input-field">
         <input type="text" name="name" placeholder=" " required>
-        <label>Enter Full Name</label>
+        <label>Full Name</label>
       </div>
 
       <div class="input-field">
@@ -129,14 +120,13 @@
       <div class="input-field">
         <select name="user_type" required>
           <option value="" disabled selected></option>
-          <option value="guest">Guest</option>
-          <option value="inmate">Inmate</option>
-          <option value="outmess">Outmess</option>
+          <option value="guest">Ifthaar Only</option>
+          <option value="inmate">Athaayam Only</option>
+          <option value="outmess">Both</option>
         </select>
         <label>User Type</label>
       </div>
 
-      <!-- ✅ New Veg / Non-Veg Dropdown -->
       <div class="input-field">
         <select name="food_type" required>
           <option value="" disabled selected></option>
@@ -146,13 +136,53 @@
         <label>Food Preference</label>
       </div>
 
-      <button type="submit" class="w-full p-3 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition">Register</button>
+      <!-- 🚚 Delivery Option -->
+      <div class="input-field">
+        <select name="delivery_enabled" id="deliverySelect" required>
+          <option value="0" selected>No</option>
+          <option value="1">Yes</option>
+        </select>
+        <label>Food Delivery?</label>
+      </div>
+
+      <!-- 🏠 Address -->
+      <div class="input-field hidden" id="addressBox">
+        <textarea
+          name="delivery_address"
+          rows="3"
+          placeholder=" "
+        ></textarea>
+        <label>Delivery Address</label>
+      </div>
+
+      <button type="submit"
+        class="w-full p-3 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition font-semibold">
+        Register
+      </button>
     </form>
 
     <p class="mt-4 text-center text-gray-700 text-sm">
-      Already have an account? 
+      Already have an account?
       <a href="{{ url_for('login') }}" class="text-indigo-500 hover:underline">Login</a>
     </p>
   </div>
+
+  <!-- Toggle Address -->
+  <script>
+    const deliverySelect = document.getElementById("deliverySelect");
+    const addressBox = document.getElementById("addressBox");
+
+    function toggleAddress() {
+      if (deliverySelect.value === "1") {
+        addressBox.classList.remove("hidden");
+      } else {
+        addressBox.classList.add("hidden");
+      }
+    }
+
+    deliverySelect.addEventListener("change", toggleAddress);
+    toggleAddress();
+  </script>
+
 </body>
 </html>
