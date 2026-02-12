@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Register</title>
   <script src="https://cdn.tailwindcss.com"></script>
+
   <style>
     body {
       font-family: 'Roboto', sans-serif;
@@ -15,6 +16,7 @@
       align-items: center;
       padding: 1rem;
     }
+
     .card {
       background: rgba(255,255,255,0.95);
       backdrop-filter: blur(10px);
@@ -24,11 +26,14 @@
       max-width: 24rem;
       box-shadow: 0 10px 25px rgba(0,0,0,0.15);
     }
+
     .input-field {
       position: relative;
       margin-bottom: 1.5rem;
     }
-    .input-field input, .input-field select {
+
+    .input-field input, 
+    .input-field select {
       width: 100%;
       padding: 14px;
       border-radius: 0.5rem;
@@ -37,6 +42,7 @@
       transition: border 0.3s;
       font-size: 1rem;
     }
+
     .input-field label {
       position: absolute;
       top: 50%;
@@ -49,6 +55,7 @@
       pointer-events: none;
       font-size: 1rem;
     }
+
     .input-field input:focus + label,
     .input-field input:not(:placeholder-shown) + label,
     .input-field select:focus + label,
@@ -58,6 +65,7 @@
       font-size: 0.75rem;
       color: #4f46e5;
     }
+
     .flash {
       padding: 0.75rem 1rem;
       border-radius: 0.5rem;
@@ -66,27 +74,13 @@
       text-align: center;
       font-size: 0.875rem;
     }
+
     .flash-success { background-color: #27ae60; color: white; }
     .flash-danger { background-color: #e74c3c; color: white; }
 
-    @media (max-width: 400px) {
-      .card {
-        padding: 1.5rem;
-      }
-      .input-field input, .input-field select {
-        padding: 12px;
-        font-size: 0.95rem;
-      }
-      .input-field label {
-        font-size: 0.9rem;
-      }
-      button {
-        padding: 12px;
-        font-size: 0.95rem;
-      }
-    }
   </style>
 </head>
+
 <body>
   <div class="card">
     <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">Register</h2>
@@ -101,6 +95,7 @@
     {% endwith %}
 
     <form method="POST" action="{{ url_for('register') }}">
+
       <div class="input-field">
         <input type="text" name="name" placeholder=" " required>
         <label>Enter Full Name</label>
@@ -136,7 +131,6 @@
         <label>User Type</label>
       </div>
 
-      <!-- ✅ New Veg / Non-Veg Dropdown -->
       <div class="input-field">
         <select name="food_type" required>
           <option value="" disabled selected></option>
@@ -145,7 +139,8 @@
         </select>
         <label>Food Preference</label>
       </div>
-       <div class="input-field">
+
+      <div class="input-field">
         <select name="meal_type" required>
           <option value="" disabled selected></option>
           <option value="ifthaar">Ifthaar only</option>
@@ -154,28 +149,58 @@
         </select>
         <label>Meal Type</label>
       </div>
-	<div class="input-field">
-  	 <select name="delivery_enabled" id="delivery_enabled" onchange="toggleAddress()" required>
-   	     <option value="" disabled selected></option>
-           <option value="0">No Delivery</option>
-           <option value="1">Enable Delivery</option>
+
+      <!-- Delivery Option -->
+      <div class="input-field">
+        <select name="delivery_enabled" id="delivery_enabled" required>
+          <option value="" disabled selected></option>
+          <option value="0">No Delivery</option>
+          <option value="1">Enable Delivery</option>
         </select>
         <label>Delivery Option</label>
       </div>
-	<!-- Delivery Address (Hidden Initially) -->
+
+      <!-- Delivery Address -->
       <div class="input-field" id="addressField" style="display:none;">
-        <input type="text" name="delivery_address" placeholder=" ">
-       <label>Delivery Address</label>
+        <input type="text" name="delivery_address" id="delivery_address" placeholder=" ">
+        <label>Delivery Address</label>
       </div>
 
+      <button type="submit"
+        class="w-full p-3 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition">
+        Register
+      </button>
 
-      <button type="submit" class="w-full p-3 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition">Register</button>
     </form>
 
     <p class="mt-4 text-center text-gray-700 text-sm">
-      Already have an account? 
+      Already have an account?
       <a href="{{ url_for('login') }}" class="text-indigo-500 hover:underline">Login</a>
     </p>
   </div>
+
+  <!-- JavaScript -->
+  <script>
+    const deliverySelect = document.getElementById("delivery_enabled");
+    const addressField = document.getElementById("addressField");
+    const addressInput = document.getElementById("delivery_address");
+
+    function toggleAddress() {
+      if (deliverySelect.value === "1") {
+        addressField.style.display = "block";
+        addressInput.setAttribute("required", "required");
+      } else {
+        addressField.style.display = "none";
+        addressInput.removeAttribute("required");
+        addressInput.value = "";
+      }
+    }
+
+    deliverySelect.addEventListener("change", toggleAddress);
+
+    // Run on page load
+    document.addEventListener("DOMContentLoaded", toggleAddress);
+  </script>
+
 </body>
 </html>
