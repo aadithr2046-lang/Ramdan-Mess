@@ -1788,6 +1788,97 @@ def users_mess_count():
         if conn:
             conn.close()
         return jsonify({'users': [], 'error': str(e)})
+@app.route('/admin/mess_summary')
+@login_required
+def mess_summary():
+
+    if not current_user.is_admin:
+        flash("Unauthorized!", "danger")
+        return redirect(url_for('index'))
+
+    selected_date = request.args.get('date')
+
+    if not selected_date:
+        flash("Please select a date.", "warning")
+        return redirect(url_for('admin_dashboard'))
+
+    conn = mysql_pool.get_connection()
+    cur = conn.cursor(dictionary=True)
+
+    try:
+        # 🔹 DELIVERY USERS WITHOUT CUT (Full Details)
+        delivery_query = """
+            SELECT 
+                u.name,
+                u.phone,
+                u.delivery_address,
+                u.meal_type
+            FROM users u
+            LEFT JOIN mess_cut mc 
+                ON u.id = mc.user_id 
+                AND mc.cut_date = %s
+            WHERE mc.user_id IS NULL
+            AND u.delivery_enabled = 1
+        """
+
+        cur.execute(delivery_query, (selected_date,))
+        delivery_users = cur.fetchall()
+
+        # 🔹 NON DELIVERY COUNT
+        non_delivery_query = """
+            SELECT COUNT(*) AS count
+            FROM users u
+            LEFT JOIN mess_cut mc 
+                ON u.id = mc.user_id 
+                AND mc.cut_date = %s
+            WHERE mc.user_id IS NULL
+            AND u.delivery_enabled = 0
+        """
+
+        cur.execute(non_delivery_query, (selected_date,))
+        non_delivery_count = cur.fetchone()['count']
+
+        # 🔹 MEAL TYPE COUNT (Ifthaar / Athaayam / Both)
+        meal_query = """
+            SELECT 
+                u.meal_type,
+                COUNT(*) AS total
+            FROM users u
+            LEFT JOIN mess_cut mc 
+                ON u.id = mc.user_id 
+                AND mc.cut_date = %s
+            WHERE mc.user_id IS NULL
+            GROUP BY u.meal_type
+        """
+
+        cur.execute(meal_query, (selected_date,))
+        meal_results = cur.fetchall()
+
+        ifthaar_count = 0
+        athaayam_count = 0
+        both_count = 0
+
+        for row in meal_results:
+            if row['meal_type'] == 'ifthaar':
+                ifthaar_count = row['total']
+            elif row['meal_type'] == 'athaayam':
+                athaayam_count = row['total']
+            elif row['meal_type'] == 'both':
+                both_count = row['total']
+
+    finally:
+        cur.close()
+        conn.close()
+
+    return render_template(
+        "mess_summary.html",
+        delivery_users=delivery_users,
+        non_delivery_count=non_delivery_count,
+        ifthaar_count=ifthaar_count,
+        athaayam_count=athaayam_count,
+        both_count=both_count,
+        selected_date=selected_date
+    )
 
 
 # ---------------- ADMIN: Validate QR and increment mess_count ----------------

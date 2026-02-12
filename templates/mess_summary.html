@@ -1,0 +1,37 @@
+<h2>Mess Summary for {{ selected_date }}</h2>
+
+<h3>🍽 Meal Summary (No Cut)</h3>
+<ul>
+    <li>🌙 Ifthaar Only: {{ ifthaar_count }}</li>
+    <li>🌙 Athaayam Only: {{ athaayam_count }}</li>
+    <li>🌙 Both: {{ both_count }}</li>
+</ul>
+
+<hr>
+
+<h3>🚚 Delivery Users (No Cut)</h3>
+
+<table border="1">
+    <tr>
+        <th>Name</th>
+        <th>Phone</th>
+        <th>Address</th>
+        <th>Meal Type</th>
+    </tr>
+
+    {% for user in delivery_users %}
+    <tr>
+        <td>{{ user.name }}</td>
+        <td>{{ user.phone }}</td>
+        <td>{{ user.delivery_address }}</td>
+        <td>{{ user.meal_type }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<p><strong>Total Delivery:</strong> {{ delivery_users|length }}</p>
+
+<hr>
+
+<h3>🍽 Non-Delivery Users (No Cut)</h3>
+<p><strong>Total Non-Delivery:</strong> {{ non_delivery_count }}</p>
