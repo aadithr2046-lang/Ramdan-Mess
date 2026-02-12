@@ -152,7 +152,7 @@ def register():
         user_type = request.form['user_type']  # student or admin
         food_type = request.form['food_type']
         meal_type=request.form['meal_type']# veg or non-veg  ✅
-        delivery_enable=request.form['delivery_enabled']
+        delivery_enabled=request.form['delivery_enabled']
         delivery_address=request.form['delivery_address']
         # Basic required fields check
         if not name or not email or not password or not user_type or not food_type:
