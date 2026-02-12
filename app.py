@@ -283,15 +283,16 @@ from flask_login import login_required, current_user
 @app.route('/approve_user/<int:user_id>')
 @login_required
 def approve_user(user_id):
-    if not current_user.is_admin:   # ensure only admin can approve
+
+    if not current_user.is_admin:
         flash("❌ Unauthorized", "danger")
         return redirect(url_for('user_dashboard'))
 
-    conn = mysql_pool.get_connection()         # Get connection from pool
-    cur = conn.cursor(dictionary=True)         # DictCursor equivalent
+    conn = mysql_pool.get_connection()
+    cur = conn.cursor(dictionary=True)
 
     try:
-        # 1. Fetch user details from new_users
+        # 1️⃣ Fetch from new_users
         cur.execute("SELECT * FROM new_users WHERE id = %s", (user_id,))
         user = cur.fetchone()
 
@@ -299,60 +300,83 @@ def approve_user(user_id):
             flash("⚠️ User not found!", "warning")
             return redirect(url_for('new_users_list'))
 
-        # 2. Prevent duplicate email
+        # 2️⃣ Check duplicate email
         cur.execute("SELECT id FROM users WHERE email = %s", (user['email'],))
         if cur.fetchone():
-            flash("⚠️ A user with this email already exists!", "danger")
+            flash("⚠️ Email already exists!", "danger")
             return redirect(url_for('new_users_list'))
 
-        # 3. Insert into users (qr_path left empty initially)
+        # 3️⃣ Insert into users (ALL 12 VALUES CORRECT)
         cur.execute("""
-            INSERT INTO users (name, email, phone, course, password, user_type,food_type,meal_type,
-            delivery_enabled, delivery_address, approved, qr_path)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s ,%s,%s,%s )
+            INSERT INTO users (
+                name,
+                email,
+                phone,
+                course,
+                password,
+                user_type,
+                food_type,
+                meal_type,
+                delivery_enabled,
+                delivery_address,
+                approved,
+                qr_path
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
-            user['name'], user['email'], user['phone'], user['course'],
-            user['password'], user['user_type'],user['food_type'], 1, ""
+            user['name'],
+            user['email'],
+            user['phone'],
+            user['course'],
+            user['password'],
+            user['user_type'],
+            user['food_type'],
+            user.get('meal_type', None),
+            int(user.get('delivery_enabled', 0)),
+            user.get('delivery_address', None),
+            1,
+            ""  # temporary qr_path
         ))
 
         new_user_id = cur.lastrowid
 
-        # 4. Generate QR Code
+        # 4️⃣ Generate QR
         qr_data = f"ID:{new_user_id}|Name:{user['name']}|Email:{user['email']}|Type:{user['user_type']}"
         qr = qrcode.QRCode(version=1, box_size=10, border=5)
         qr.add_data(qr_data)
         qr.make(fit=True)
         img = qr.make_image(fill_color='black', back_color='white')
 
-        # Save QR code in static/qrcodes/
         qr_folder = os.path.join("static", "qrcodes")
         os.makedirs(qr_folder, exist_ok=True)
-        qr_filename = f"user_{new_user_id}.png"
-        qr_path = os.path.join(qr_folder, qr_filename)
-        img.save(qr_path)
 
-        # Store relative path so template can use {{ url_for('static', filename='qrcodes/xxx.png') }}
+        qr_filename = f"user_{new_user_id}.png"
+        qr_full_path = os.path.join(qr_folder, qr_filename)
+        img.save(qr_full_path)
+
         db_qr_path = f"qrcodes/{qr_filename}"
 
-        # 5. Update QR path in users table
-        cur.execute("UPDATE users SET qr_path = %s WHERE id = %s", (db_qr_path, new_user_id))
+        # 5️⃣ Update QR path
+        cur.execute(
+            "UPDATE users SET qr_path = %s WHERE id = %s",
+            (db_qr_path, new_user_id)
+        )
 
-        # 6. Delete from new_users
-        cur.execute("DELETE FROM new_users WHERE id=%s", (user_id,))
+        # 6️⃣ Delete from new_users
+        cur.execute("DELETE FROM new_users WHERE id = %s", (user_id,))
 
-        # ✅ Commit once after all queries
         conn.commit()
 
-        flash("✅ User approved successfully and QR code generated.", "success")
+        flash("✅ User approved successfully & QR generated", "success")
 
     except Exception as e:
         conn.rollback()
-        flash(f"❌ Error approving user: {str(e)}", "danger")
-        print("Approve user error:", e)  # debug log
+        flash(f"❌ Error: {str(e)}", "danger")
+        print("Approve user error:", e)
 
     finally:
         cur.close()
-        conn.close()                          # Return connection to pool
+        conn.close()
 
     return redirect(url_for('new_users_list'))
 
