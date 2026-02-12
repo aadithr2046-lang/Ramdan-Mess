@@ -1792,6 +1792,7 @@ def users_mess_count():
 
     
 from datetime import date
+from datetime import date
 
 @app.route('/admin/mess_summary')
 @login_required
@@ -1813,7 +1814,7 @@ def mess_summary():
     both_count = 0
 
     try:
-        # ✅ DELIVERY USERS WITHOUT TODAY CUT
+        # ✅ DELIVERY USERS WITHOUT CUT TODAY
         delivery_query = """
             SELECT 
                 u.name,
@@ -1826,7 +1827,7 @@ def mess_summary():
             AND NOT EXISTS (
                 SELECT 1 FROM mess_cut mc
                 WHERE mc.user_id = u.id
-                AND mc.cut_date = %s
+                AND %s BETWEEN mc.start_date AND mc.end_date
             )
         """
 
@@ -1842,7 +1843,7 @@ def mess_summary():
             AND NOT EXISTS (
                 SELECT 1 FROM mess_cut mc
                 WHERE mc.user_id = u.id
-                AND mc.cut_date = %s
+                AND %s BETWEEN mc.start_date AND mc.end_date
             )
         """
 
@@ -1860,7 +1861,7 @@ def mess_summary():
             AND NOT EXISTS (
                 SELECT 1 FROM mess_cut mc
                 WHERE mc.user_id = u.id
-                AND mc.cut_date = %s
+                AND %s BETWEEN mc.start_date AND mc.end_date
             )
             GROUP BY u.meal_type
         """
@@ -1880,6 +1881,7 @@ def mess_summary():
 
     except Exception as e:
         flash(f"Error loading summary: {e}", "danger")
+        print("Mess summary error:", e)
 
     finally:
         cur.close()
