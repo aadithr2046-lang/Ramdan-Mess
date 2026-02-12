@@ -1,3 +1,8 @@
+
+
+
+
+
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -11,12 +16,18 @@ from mysql.connector import pooling
 # ---------------- Flask App ----------------
 app = Flask(__name__)
 app.config.from_object(Config)
+import resend
+import os
+resend.api_key = os.environ.get("RESEND_API_KEY")
+VERIFIED_SENDER_EMAIL = os.getenv("BREVO_SENDER_EMAIL")
 
 # ---------------- MySQL Connection Pool ----------------
 # app.py (or wherever you configure your DB)
 import os
 from mysql.connector import pooling, Error
 from mysql.connector import pooling
+
+
 
 mysql_pool = pooling.MySQLConnectionPool(
     pool_name="mypool",
@@ -28,6 +39,7 @@ mysql_pool = pooling.MySQLConnectionPool(
     user="root",          # ✅ your RDS username
     password="JmiJwZMzBQQUnVbnLPaFRkldruOGLeLL"   # ✅ your RDS password
 )
+
 
 
 
@@ -139,9 +151,9 @@ def register():
         password = request.form['password']
         user_type = request.form['user_type']  # student or admin
         food_type = request.form['food_type']
-        delivery_enabled = request.form.get('delivery_enabled')# veg or non-veg  ✅
+        meal_type=request.form['meal_type']# veg or non-veg  ✅
+        delivery_enable=request.form['delivery_enabled']
         delivery_address=request.form['delivery_address']
-
         # Basic required fields check
         if not name or not email or not password or not user_type or not food_type:
             flash("All fields are required.", "danger")
@@ -162,9 +174,9 @@ def register():
         try:
             # Insert into new_users table (added food_type)
             cur.execute("""
-                INSERT INTO new_users (name, email, phone, course, password, user_type, food_type,delivery_enabled,delivery_address)
-                VALUES (%s, %s, %s, %s, %s, %s, %s,%s,%s)
-            """, (name, email, phone, course, hashed_password, user_type, food_type,delivery_enabled,delivery_address))
+                INSERT INTO new_users (name, email, phone, course, password, user_type, food_type,meal_type,delivery_enabled,delivery_address)
+                VALUES (%s, %s, %s, %s, %s, %s, %s,%s,%s,%s)
+            """, (name, email, phone, course, hashed_password, user_type, food_type,meal_type,delivery_enabled,delivery_address))
             conn.commit()
             flash("Registration successful! Await admin approval.", "success")
         except Exception as e:
@@ -1166,9 +1178,6 @@ def live_count(meal_type):
 
 
 
-# --------------------------------------------
-# REQUIRED IMPORTS (make sure these are at top)
-# --------------------------------------------
 import calendar
 import csv
 import io
@@ -1182,9 +1191,6 @@ from flask import (
 from flask_login import login_required, current_user
 
 
-# --------------------------------------------
-# FINAL, FULLY FIXED GENERATE_BILLS FUNCTION
-# --------------------------------------------
 @app.route('/admin/generate_bills', methods=['GET', 'POST'])
 @login_required
 def generate_bills():
@@ -1199,23 +1205,23 @@ def generate_bills():
         conn = mysql_pool.get_connection()
         cur = conn.cursor(dictionary=True)
 
-        # ---------- FORM SUBMISSION ----------
+        # ------------------ FORM SUBMISSION ------------------
         if request.method == "POST":
 
             bill_month = request.form.get("bill_month")
             closed_str = request.form.get("mess_closed_dates", "")
 
             if not bill_month:
-                flash("Select a month", "warning")
+                flash("Please select a month", "warning")
                 return redirect(url_for("generate_bills"))
 
-            # Billing month boundaries
+            # Month boundaries
             year, month = map(int, bill_month.split("-"))
             start_date = date(year, month, 1)
             last_day = calendar.monthrange(year, month)[1]
             end_date = date(year, month, last_day)
 
-            # Closed dates
+            # Parse closed dates
             closed_dates = set()
             if closed_str.strip():
                 for d in closed_str.split(","):
@@ -1226,18 +1232,18 @@ def generate_bills():
                         except:
                             pass
 
-            # Delete previous bills for this month
+            # Remove old bills for this month
             cur.execute("DELETE FROM bills WHERE bill_date=%s", (start_date,))
             conn.commit()
 
-            # Fetch all users
+            # Get all users
             cur.execute("SELECT id, name FROM users")
             users = cur.fetchall()
 
-            # ---------------- MAIN USER LOOP ----------------
+            # ------------------ MAIN USER LOOP ------------------
             for u in users:
 
-                # ---- 1. FETCH RAW MESS CUTS ----
+                # ---- FETCH RAW MESS CUTS ----
                 cur.execute("""
                     SELECT start_date, end_date
                     FROM mess_cut
@@ -1245,68 +1251,72 @@ def generate_bills():
                       AND start_date <= %s
                       AND end_date >= %s
                     ORDER BY start_date
-                """, (u['id'], end_date, start_date))
+                """, (u["id"], end_date, start_date))
 
                 raw_cuts = cur.fetchall()
                 cuts = []
 
-                # Convert to Python dates
+                # Convert strings → dates
                 for c in raw_cuts:
-                    s = c['start_date']
-                    e = c['end_date']
-
+                    s = c["start_date"]
+                    e = c["end_date"]
                     if isinstance(s, str):
                         s = datetime.strptime(s, "%Y-%m-%d").date()
                     if isinstance(e, str):
                         e = datetime.strptime(e, "%Y-%m-%d").date()
-
                     cuts.append((s, e))
 
-                # ---- 2. EXPAND CUTS INTO DAYS ----
-                all_days = []
-                for s, e in cuts:
-                    cur_day = s
-                    while cur_day <= e:
-                        all_days.append(cur_day)
-                        cur_day += timedelta(days=1)
-                all_days = sorted(all_days)
-
-                # ---- 3. MERGE INTO BLOCKS ----
+                # ------------- MERGE contiguous / overlapping -------------
                 merged = []
-                block = []
-                for d in all_days:
-                    if not block:
-                        block = [d]
-                    elif (d - block[-1]).days == 1:
-                        block.append(d)
+                for s, e in sorted(cuts):
+                    if not merged:
+                        merged.append([s, e])
                     else:
-                        merged.append(block)
-                        block = [d]
-                if block:
-                    merged.append(block)
+                        last_s, last_e = merged[-1]
+                        if s <= last_e + timedelta(days=1):  # extension allowed
+                            merged[-1][1] = max(last_e, e)
+                        else:
+                            merged.append([s, e])
 
-                # ---- 4. FILTER CLOSED DAYS (NO 3-DAY RULE) ----
+                # ------------- PER-MONTH SPLIT + 3-DAY RULE ---------------
                 mess_cut_days = 0
-                for block in merged:
-                    for d in block:
-                        if start_date <= d <= end_date and d not in closed_dates:
-                            mess_cut_days += 1
 
-                # ---- 5. LATE MESS FEE ----
+                for s, e in merged:
+
+                    # Build list of valid dates *belonging to this billing month only*
+                    month_days = []
+                    current = s
+                    while current <= e:
+                        if start_date <= current <= end_date:  # inside bill month
+                            if current not in closed_dates:    # not closed
+                                month_days.append(current)
+                        current += timedelta(days=1)
+
+                    # Debug
+                    print(f"[DEBUG] User {u['name']} valid days in month: {month_days}")
+
+                    # Apply 3-day rule on the per-month block
+                    if len(month_days) >= 3:
+                        mess_cut_days += len(month_days)
+                        print(f"[DEBUG] ✔ Counted {len(month_days)} days")
+                    else:
+                        print(f"[DEBUG] ✘ Rejected (<3 days)")
+
+                # ------------- LATE MESS FEE -------------
                 cur.execute("""
                     SELECT COUNT(*) AS c
                     FROM late_mess
                     WHERE user_id=%s
                       AND date_requested BETWEEN %s AND %s
-                """, (u['id'], start_date, end_date))
+                """, (u["id"], start_date, end_date))
 
-                late_fee = cur.fetchone()['c'] * 5
+                late_fee = cur.fetchone()["c"] * 5
 
-                # ---- 6. INSERT BILL ----
+                # ------------- INSERT BILL -------------
                 cur.execute("""
                     INSERT INTO bills (user_id, bill_date, mess_cut_days, late_mess_fee)
                     VALUES (%s, %s, %s, %s)
-                """, (u['id'], start_date, mess_cut_days, late_fee))
+                """, (u["id"], start_date, mess_cut_days, late_fee))
 
                 bills_generated.append({
                     "user": u["name"],
@@ -1316,12 +1326,13 @@ def generate_bills():
 
             conn.commit()
 
+            # Save for reload
             session["last_generated_bills"] = json.dumps(bills_generated)
             session["last_bill_month"] = bill_month
 
             flash("Bills generated successfully!", "success")
 
-        # ---------------- CSV EXPORT ----------------
+        # ------------------ CSV DOWNLOAD ------------------
         if request.args.get("download") == "csv":
             bills = json.loads(session.get("last_generated_bills", "[]"))
 
@@ -1337,7 +1348,7 @@ def generate_bills():
                 mimetype="text/csv",
                 headers={
                     "Content-Disposition":
-                        f"attachment; filename=bills_{session.get('last_bill_month','unknown')}.csv"
+                        f"attachment; filename=bills_{session.get('last_bill_month', 'unknown')}.csv"
                 }
             )
 
@@ -1353,11 +1364,14 @@ def generate_bills():
         if conn:
             conn.close()
 
-    # Load from session on page reload
+    # load from session
     if "last_generated_bills" in session:
         bills_generated = json.loads(session["last_generated_bills"])
 
     return render_template("admin_generate_bills.html", bills_generated=bills_generated)
+
+
+
 # ---------------- ADMIN: VIEW HISTORICAL QR SCAN COUNTS ----------------
 from flask import render_template, flash, redirect, url_for
 from flask_login import login_required, current_user
@@ -1434,104 +1448,6 @@ def admin_qr_count():
         counts_by_date=sorted_counts
     )
 
-from datetime import date, datetime, time, timedelta
-
-from datetime import date, datetime, timedelta, time
-
-@app.route('/skip_meal', methods=['GET', 'POST'])
-@login_required
-def skip_meal():
-    today = date.today()
-    now = datetime.now()
-    min_date = (today + timedelta(days=1)).strftime('%Y-%m-%d')
-
-    if request.method == 'POST':
-        meal_type = request.form.get('meal_type')  # athaayam / ifthaar
-        skip_date = request.form.get('skip_date')
-        reason = request.form.get('reason', None)
-
-        if meal_type not in ['athaayam', 'ifthaar']:
-            flash("Invalid meal type", "danger")
-            return redirect(url_for('skip_meal'))
-
-        skip_date = datetime.strptime(skip_date, "%Y-%m-%d").date()
-
-        # ❌ Past date check
-        if skip_date <= today:
-            flash("You can only apply mess skip for future dates.", "warning")
-            return redirect(url_for('skip_meal'))
-
-        # ⏰ 10 PM previous day cutoff
-        cutoff_datetime = datetime.combine(
-            skip_date - timedelta(days=1),
-            time(22, 0)  # 10:00 PM
-        )
-
-        if now > cutoff_datetime:
-            flash(
-                "Mess skip must be applied before 10:00 PM of the previous day.",
-                "warning"
-            )
-            return redirect(url_for('skip_meal'))
-
-        conn = mysql_pool.get_connection()
-        cur = conn.cursor(dictionary=True)
-
-        try:
-            # 🚫 Check mess cut
-            cur.execute("""
-                SELECT id
-                FROM mess_cut
-                WHERE user_id = %s
-                  AND %s BETWEEN from_date AND to_date
-            """, (current_user.id, skip_date))
-
-            if cur.fetchone():
-                flash(
-                    "You already have a mess cut on this date. Mess skip not allowed.",
-                    "warning"
-                )
-                return redirect(url_for('skip_meal'))
-
-            # 🚫 Check existing mess skip (same day)
-            cur.execute("""
-                SELECT id
-                FROM meal_skip
-                WHERE user_id = %s
-                  AND skip_date = %s
-            """, (current_user.id, skip_date))
-
-            if cur.fetchone():
-                flash(
-                    "You have already applied a mess skip for this date.",
-                    "info"
-                )
-                return redirect(url_for('skip_meal'))
-
-            # ✅ Insert mess skip
-            cur.execute("""
-                INSERT INTO meal_skip (user_id, skip_date, meal_type, reason)
-                VALUES (%s, %s, %s, %s)
-            """, (current_user.id, skip_date, meal_type, reason))
-
-            conn.commit()
-            flash("Mess skip applied successfully!", "success")
-
-        except Exception as e:
-            conn.rollback()
-            flash("Unable to apply mess skip. Please try again.", "danger")
-
-        finally:
-            cur.close()
-            conn.close()
-
-        return redirect(url_for('skip_meal'))
-
-    # ✅ GET request
-    return render_template("skip_meal.html", min_date=min_date)
-
-
-    
 
 
 from flask import jsonify, request
@@ -1747,65 +1663,6 @@ def users_meal_counts():
         if cur: cur.close()
         if conn: conn.close()
 
-@app.route('/admin/mess_skips')
-@login_required
-def admin_mess_skips():
-    if not getattr(current_user, 'is_admin', False):
-        flash("Unauthorized access", "danger")
-        return redirect(url_for('user_dashboard'))
-
-    tomorrow = date.today() + timedelta(days=1)
-
-    conn = mysql_pool.get_connection()
-    cur = conn.cursor(dictionary=True)
-
-    try:
-        # 🔹 All skips (latest first)
-        cur.execute("""
-            SELECT ms.id,
-                   u.name,
-                   u.course,
-                   ms.skip_date,
-                   ms.meal_type,
-                   ms.reason,
-                   ms.applied_at
-            FROM meal_skip ms
-            JOIN users u ON u.id = ms.user_id
-            ORDER BY ms.skip_date DESC, ms.meal_type
-        """)
-        all_skips = cur.fetchall()
-
-        # 🔹 Tomorrow counts
-        cur.execute("""
-            SELECT meal_type, COUNT(*) AS total
-            FROM meal_skip
-            WHERE skip_date = %s
-            GROUP BY meal_type
-        """, (tomorrow,))
-        raw_counts = cur.fetchall()
-
-        tomorrow_counts = {
-            "athaayam": 0,
-            "ifthaar": 0
-        }
-        for r in raw_counts:
-            tomorrow_counts[r['meal_type']] = r['total']
-
-    except Exception as e:
-        flash(f"Database error: {e}", "danger")
-        all_skips = []
-        tomorrow_counts = {"athaayam": 0, "ifthaar": 0}
-
-    finally:
-        cur.close()
-        conn.close()
-
-    return render_template(
-        "admin_mess_skips.html",
-        all_skips=all_skips,
-        tomorrow=tomorrow.strftime("%d-%m-%Y"),
-        tomorrow_counts=tomorrow_counts
-    )
 
 
 # ---------------- ADMIN: Add mess cut for any user ----------------
@@ -2166,8 +2023,62 @@ from flask_mail import Mail,Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 
 # Serializer for generating and validating tokens
+from flask_mail import Mail, Message
+from itsdangerous import URLSafeTimedSerializer
+
+
+
+import requests
+import os
+from itsdangerous import URLSafeTimedSerializer
+from flask import request, redirect, url_for, flash, render_template
+
+BREVO_API_KEY = os.getenv("BREVO_API_KEY")
 s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
-mail = Mail(app)
+
+
+def send_reset_email(email, name, reset_url):
+    url = "https://api.brevo.com/v3/smtp/email"
+
+    headers = {
+        "accept": "application/json",
+        "api-key": BREVO_API_KEY,
+        "content-type": "application/json"
+    }
+
+    payload = {
+        "sender": {
+            "name": "Siberia Mess",
+            "email": VERIFIED_SENDER_EMAIL
+        },
+        "to": [{
+            "email": email,
+            "name": name
+        }],
+        "subject": "Password Reset Request",
+        "htmlContent": f"""
+            <p>Hello <strong>{name}</strong>,</p>
+            <p>You requested a password reset.</p>
+            <p><a href="{reset_url}">Reset Password</a></p>
+            <p>This link is valid for <b>30 minutes</b>.</p>
+            <p>If you did not request this, please ignore this email.</p>
+        """
+    }
+
+    response = requests.post(
+        url,
+        headers=headers,
+        json=payload,
+        timeout=10
+    )
+
+    print("BREVO STATUS:", response.status_code)
+    print("BREVO RESPONSE:", response.text)
+
+    if response.status_code not in (200, 201):
+        raise Exception(response.text)
+
+
 @app.route('/forgot', methods=['GET', 'POST'])
 def forgot():
     if request.method == 'POST':
@@ -2177,12 +2088,13 @@ def forgot():
             flash("Please enter your email.", "danger")
             return redirect(url_for('forgot'))
 
-        # Check if the email exists in the users table
         conn = None
         cur = None
+
         try:
             conn = mysql_pool.get_connection()
             cur = conn.cursor(dictionary=True)
+
             cur.execute("SELECT * FROM users WHERE email=%s", (email,))
             user = cur.fetchone()
 
@@ -2190,33 +2102,30 @@ def forgot():
                 flash("Email not found.", "danger")
                 return redirect(url_for('forgot'))
 
-            # Generate token valid for 30 minutes
             token = s.dumps(email, salt='password-reset-salt')
             reset_url = url_for('reset_password', token=token, _external=True)
 
-            # Prepare email
-            msg = Message(
-                subject="Password Reset Request",
-                recipients=[email],
-                body=f"Hello {user['name']},\n\nTo reset your password, click the link below:\n{reset_url}\n\nThis link is valid for 30 minutes.",
-                sender=app.config['MAIL_DEFAULT_SENDER']
-            )
+            send_reset_email(email, user['name'], reset_url)
 
-            mail.send(msg)
-            flash("Password reset link has been sent to your email.", "success")
+            flash("A password reset link has been sent to your email.", "success")
             return redirect(url_for('login'))
 
         except Exception as e:
-            flash(f"Error sending email: {str(e)}", "danger")
+            print("🔥 BREVO EMAIL ERROR:", e)
+            flash("Unable to send email. Try again later.", "danger")
             return redirect(url_for('forgot'))
 
         finally:
-            if cur:
-                cur.close()
-            if conn:
-                conn.close()  # Return connection to pool
+            try:
+                if cur:
+                    cur.close()
+                if conn:
+                    conn.close()
+            except:
+                pass
 
     return render_template('forgot.html')
+
 
 
 
@@ -2228,14 +2137,21 @@ from werkzeug.security import generate_password_hash
 @app.route('/reset_password/<token>', methods=['GET', 'POST'])
 def reset_password(token):
     try:
-        email = s.loads(token, salt='password-reset-salt', max_age=3600)  # get email from token
-    except:
-        flash("The reset link is invalid or has expired.", "danger")
-        return redirect(url_for('login'))
+        email = s.loads(token, salt='password-reset-salt', max_age=1800)  # 30 mins
+    except SignatureExpired:
+        flash("The reset link has expired.", "danger")
+        return redirect(url_for('forgot'))
+    except BadSignature:
+        flash("Invalid reset link.", "danger")
+        return redirect(url_for('forgot'))
 
     if request.method == 'POST':
         password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
+
+        if not password or not confirm_password:
+            flash("All fields are required.", "danger")
+            return redirect(request.url)
 
         if password != confirm_password:
             flash("Passwords do not match.", "danger")
@@ -2243,14 +2159,20 @@ def reset_password(token):
 
         hashed_pw = generate_password_hash(password)
 
-        conn = mysql_pool.get_connection()
-        cur = conn.cursor()
-        cur.execute("UPDATE users SET password=%s WHERE email=%s", (hashed_pw, email))
-        conn.commit()
-        cur.close()
-        conn.close()
+        try:
+            conn = mysql_pool.get_connection()
+            cur = conn.cursor()
+            cur.execute("UPDATE users SET password=%s WHERE email=%s", (hashed_pw, email))
+            conn.commit()
+        except Exception as e:
+            print("🔥 RESET PASSWORD ERROR:", e)
+            flash("Error updating password.", "danger")
+            return redirect(request.url)
+        finally:
+            if cur: cur.close()
+            if conn: conn.close()
 
-        flash("Your password has been reset. You can now login.", "success")
+        flash("Your password has been reset successfully!", "success")
         return redirect(url_for('login'))
 
     return render_template('reset.html')
@@ -2262,5 +2184,6 @@ def reset_password(token):
 # ----------------- START APP -----------------
 if __name__ == '__main__':
     app.run(debug=True)
+
 
 
