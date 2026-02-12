@@ -1,37 +1,68 @@
-<h2>Mess Summary for {{ selected_date }}</h2>
+{% extends "base.html" %}
 
-<h3>🍽 Meal Summary (No Cut)</h3>
-<ul>
-    <li>🌙 Ifthaar Only: {{ ifthaar_count }}</li>
-    <li>🌙 Athaayam Only: {{ athaayam_count }}</li>
-    <li>🌙 Both: {{ both_count }}</li>
-</ul>
+{% block content %}
 
-<hr>
+<h2 class="mb-4">📊 Today's Mess Summary ({{ today }})</h2>
 
-<h3>🚚 Delivery Users (No Cut)</h3>
+<!-- Meal Summary -->
+<div class="card mb-4 shadow-sm">
+    <div class="card-body">
+        <h4 class="card-title mb-3">🍽 Meal Summary (No Cut)</h4>
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item">🌙 Ifthaar Only: <strong>{{ ifthaar_count }}</strong></li>
+            <li class="list-group-item">🌙 Athaayam Only: <strong>{{ athaayam_count }}</strong></li>
+            <li class="list-group-item">🌙 Both: <strong>{{ both_count }}</strong></li>
+        </ul>
+    </div>
+</div>
 
-<table border="1">
-    <tr>
-        <th>Name</th>
-        <th>Phone</th>
-        <th>Address</th>
-        <th>Meal Type</th>
-    </tr>
+<!-- Delivery Users -->
+<div class="card mb-4 shadow-sm">
+    <div class="card-body">
+        <h4 class="card-title mb-3">🚚 Delivery Users (No Cut)</h4>
 
-    {% for user in delivery_users %}
-    <tr>
-        <td>{{ user.name }}</td>
-        <td>{{ user.phone }}</td>
-        <td>{{ user.delivery_address }}</td>
-        <td>{{ user.meal_type }}</td>
-    </tr>
-    {% endfor %}
-</table>
+        {% if delivery_users %}
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+                <thead class="table-primary">
+                    <tr>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>Address</th>
+                        <th>Meal Type</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in delivery_users %}
+                    <tr>
+                        <td>{{ user.name }}</td>
+                        <td>{{ user.phone }}</td>
+                        <td>{{ user.delivery_address }}</td>
+                        <td>{{ user.meal_type }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
-<p><strong>Total Delivery:</strong> {{ delivery_users|length }}</p>
+        <p class="mt-2">
+            <strong>Total Delivery:</strong> {{ delivery_users|length }}
+        </p>
 
-<hr>
+        {% else %}
+        <p>No delivery users today.</p>
+        {% endif %}
+    </div>
+</div>
 
-<h3>🍽 Non-Delivery Users (No Cut)</h3>
-<p><strong>Total Non-Delivery:</strong> {{ non_delivery_count }}</p>
+<!-- Non Delivery -->
+<div class="card shadow-sm">
+    <div class="card-body">
+        <h4 class="card-title">🍽 Non-Delivery Users (No Cut)</h4>
+        <p class="fs-5">
+            <strong>Total Non-Delivery:</strong> {{ non_delivery_count }}
+        </p>
+    </div>
+</div>
+
+{% endblock %}

@@ -1788,6 +1788,11 @@ def users_mess_count():
         if conn:
             conn.close()
         return jsonify({'users': [], 'error': str(e)})
+
+
+    
+from datetime import date
+
 @app.route('/admin/mess_summary')
 @login_required
 def mess_summary():
@@ -1796,17 +1801,19 @@ def mess_summary():
         flash("Unauthorized!", "danger")
         return redirect(url_for('index'))
 
-    selected_date = request.args.get('date')
-
-    if not selected_date:
-        flash("Please select a date.", "warning")
-        return redirect(url_for('admin_dashboard'))
+    today = date.today()
 
     conn = mysql_pool.get_connection()
     cur = conn.cursor(dictionary=True)
 
+    delivery_users = []
+    non_delivery_count = 0
+    ifthaar_count = 0
+    athaayam_count = 0
+    both_count = 0
+
     try:
-        # 🔹 DELIVERY USERS WITHOUT CUT (Full Details)
+        # ✅ DELIVERY USERS WITHOUT TODAY CUT
         delivery_query = """
             SELECT 
                 u.name,
@@ -1814,57 +1821,65 @@ def mess_summary():
                 u.delivery_address,
                 u.meal_type
             FROM users u
-            LEFT JOIN mess_cut mc 
-                ON u.id = mc.user_id 
-                AND mc.cut_date = %s
-            WHERE mc.user_id IS NULL
+            WHERE u.approved = 1
             AND u.delivery_enabled = 1
+            AND NOT EXISTS (
+                SELECT 1 FROM mess_cut mc
+                WHERE mc.user_id = u.id
+                AND mc.cut_date = %s
+            )
         """
 
-        cur.execute(delivery_query, (selected_date,))
+        cur.execute(delivery_query, (today,))
         delivery_users = cur.fetchall()
 
-        # 🔹 NON DELIVERY COUNT
+        # ✅ NON DELIVERY COUNT
         non_delivery_query = """
             SELECT COUNT(*) AS count
             FROM users u
-            LEFT JOIN mess_cut mc 
-                ON u.id = mc.user_id 
-                AND mc.cut_date = %s
-            WHERE mc.user_id IS NULL
+            WHERE u.approved = 1
             AND u.delivery_enabled = 0
+            AND NOT EXISTS (
+                SELECT 1 FROM mess_cut mc
+                WHERE mc.user_id = u.id
+                AND mc.cut_date = %s
+            )
         """
 
-        cur.execute(non_delivery_query, (selected_date,))
-        non_delivery_count = cur.fetchone()['count']
+        cur.execute(non_delivery_query, (today,))
+        result = cur.fetchone()
+        non_delivery_count = result['count'] if result else 0
 
-        # 🔹 MEAL TYPE COUNT (Ifthaar / Athaayam / Both)
+        # ✅ MEAL TYPE COUNTS
         meal_query = """
             SELECT 
                 u.meal_type,
                 COUNT(*) AS total
             FROM users u
-            LEFT JOIN mess_cut mc 
-                ON u.id = mc.user_id 
+            WHERE u.approved = 1
+            AND NOT EXISTS (
+                SELECT 1 FROM mess_cut mc
+                WHERE mc.user_id = u.id
                 AND mc.cut_date = %s
-            WHERE mc.user_id IS NULL
+            )
             GROUP BY u.meal_type
         """
 
-        cur.execute(meal_query, (selected_date,))
+        cur.execute(meal_query, (today,))
         meal_results = cur.fetchall()
 
-        ifthaar_count = 0
-        athaayam_count = 0
-        both_count = 0
-
         for row in meal_results:
-            if row['meal_type'] == 'ifthaar':
+            meal = (row['meal_type'] or "").lower()
+
+            if meal == 'ifthaar':
                 ifthaar_count = row['total']
-            elif row['meal_type'] == 'athaayam':
+            elif meal == 'athaayam':
                 athaayam_count = row['total']
-            elif row['meal_type'] == 'both':
+            elif meal == 'both':
                 both_count = row['total']
+
+    except Exception as e:
+        flash(f"Error loading summary: {e}", "danger")
 
     finally:
         cur.close()
@@ -1877,7 +1892,7 @@ def mess_summary():
         ifthaar_count=ifthaar_count,
         athaayam_count=athaayam_count,
         both_count=both_count,
-        selected_date=selected_date
+        today=today
     )
 
 
