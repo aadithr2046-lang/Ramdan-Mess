@@ -138,7 +138,9 @@ def register():
         phone = request.form['phone']
         password = request.form['password']
         user_type = request.form['user_type']  # student or admin
-        food_type = request.form['food_type']  # veg or non-veg  ✅
+        food_type = request.form['food_type']
+        delivery_enabled = request.form.get('delivery_enabled')# veg or non-veg  ✅
+        delivery_address=request.form['delivery_address']
 
         # Basic required fields check
         if not name or not email or not password or not user_type or not food_type:
@@ -160,9 +162,9 @@ def register():
         try:
             # Insert into new_users table (added food_type)
             cur.execute("""
-                INSERT INTO new_users (name, email, phone, course, password, user_type, food_type)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (name, email, phone, course, hashed_password, user_type, food_type))
+                INSERT INTO new_users (name, email, phone, course, password, user_type, food_type,delivery_enabled,delivery_address)
+                VALUES (%s, %s, %s, %s, %s, %s, %s,%s,%s)
+            """, (name, email, phone, course, hashed_password, user_type, food_type,delivery_enabled,delivery_address))
             conn.commit()
             flash("Registration successful! Await admin approval.", "success")
         except Exception as e:
