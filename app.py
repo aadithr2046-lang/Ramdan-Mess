@@ -6,7 +6,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-import qrcode
+import qrcodea
 import io
 import base64
 from datetime import datetime, time
@@ -627,10 +627,6 @@ def apply_mess_cut():
             flash("Cannot apply mess cut for tomorrow after 10 PM today.", "danger")
             return redirect(url_for('apply_mess_cut'))
 
-        # Minimum 3-day range
-        if (end_date - start_date).days + 1 < 3:
-            flash("Minimum duration is 3 consecutive days.", "danger")
-            return redirect(url_for('apply_mess_cut'))
 
         # ---------------- POOL CONNECTION ----------------
         conn = mysql_pool.get_connection()  # Get connection from pool
