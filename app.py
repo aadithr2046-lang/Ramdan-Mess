@@ -696,16 +696,16 @@ def mess_cut_list():
         flash("Unauthorized", "danger")
         return redirect(url_for('user_dashboard'))
 
-    # Month filter for listing
     month_filter = request.args.get('month', datetime.now().strftime("%Y-%m"))
     filter_year, filter_month = map(int, month_filter.split("-"))
 
-    conn = mysql_pool.get_connection()          # Get connection from pool
-    cur = conn.cursor(dictionary=True)          # DictCursor equivalent
+    conn = mysql_pool.get_connection()
+    cur = conn.cursor(dictionary=True)
 
     try:
         query = """
-            SELECT m.user_id, u.name, u.course, m.start_date, m.end_date
+            SELECT m.user_id, u.name, u.course, u.meal_type,
+                   m.start_date, m.end_date
             FROM mess_cut m
             JOIN users u ON m.user_id = u.id
             WHERE (m.start_date <= LAST_DAY(%s) AND m.end_date >= %s)
@@ -714,30 +714,34 @@ def mess_cut_list():
         month_start = f"{filter_year}-{filter_month:02d}-01"
         cur.execute(query, (month_start, month_start))
         cuts = cur.fetchall()
+
     except Exception as e:
         flash(f"❌ Error fetching mess cuts: {e}", "danger")
         cuts = []
         print("mess_cut_list DB error:", e)
+
     finally:
         cur.close()
-        conn.close()                            # Return connection to pool
+        conn.close()
 
-    # Organize cuts by user
+    # -------------------------------
+    # Organize cuts by user (same as before)
+    # -------------------------------
     cuts_by_user = {}
+
     for cut in cuts:
         user_id = cut['user_id']
         start_date = cut['start_date']
         end_date = cut['end_date']
 
-        # Convert to datetime.date if needed
         if isinstance(start_date, str):
             start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
         if isinstance(end_date, str):
             end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
 
-        # Clip dates to selected month
         month_start_date = datetime(filter_year, filter_month, 1).date()
-        next_month = datetime(filter_year + filter_month // 12, (filter_month % 12) + 1, 1).date()
+        next_month = datetime(filter_year + filter_month // 12,
+                              (filter_month % 12) + 1, 1).date()
         month_end_date = next_month - timedelta(days=1)
 
         effective_start = max(start_date, month_start_date)
@@ -745,12 +749,13 @@ def mess_cut_list():
         total_days = (effective_end - effective_start).days + 1
 
         if total_days <= 0:
-            continue  # Skip if no overlap
+            continue
 
         if user_id not in cuts_by_user:
             cuts_by_user[user_id] = {
                 "name": cut['name'],
                 "course": cut['course'],
+                "meal_type": cut['meal_type'],
                 "ranges": [],
                 "total_days": 0
             }
@@ -762,30 +767,46 @@ def mess_cut_list():
         })
         cuts_by_user[user_id]["total_days"] += total_days
 
-    # Calculate total number of mess cuts for tomorrow
+    # -------------------------------
+    # 🔥 TOMORROW COUNTS BY MEAL TYPE
+    # -------------------------------
     tomorrow = datetime.now().date() + timedelta(days=1)
-    tomorrow_count = 0
+
+    ifthaar_count = 0
+    athaayam_count = 0
+    both_count = 0
+    total_tomorrow = 0
+
     for cut in cuts:
         start_date = cut['start_date']
         end_date = cut['end_date']
+        meal_type = (cut['meal_type'] or "").lower()
 
-        # Convert to date if needed
         if isinstance(start_date, str):
             start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
         if isinstance(end_date, str):
             end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
 
         if start_date <= tomorrow <= end_date:
-            tomorrow_count += 1
+            total_tomorrow += 1
 
-    # Pass data to template
+            if meal_type == "ifthaar":
+                ifthaar_count += 1
+            elif meal_type == "athaayam":
+                athaayam_count += 1
+            elif meal_type == "both":
+                both_count += 1
+
+    # -------------------------------
     return render_template(
         'mess_cut_list.html',
         cuts_by_user=cuts_by_user,
         month_filter=month_filter,
-        tomorrow_count=tomorrow_count
+        tomorrow_count=total_tomorrow,
+        ifthaar_count=ifthaar_count,
+        athaayam_count=athaayam_count,
+        both_count=both_count
     )
-
 
 
 
@@ -1788,7 +1809,7 @@ def users_mess_count():
 
     
 from datetime import date
-from datetime import date
+from datetime import date, timedelta
 
 @app.route('/admin/mess_summary')
 @login_required
@@ -1799,6 +1820,7 @@ def mess_summary():
         return redirect(url_for('index'))
 
     today = date.today()
+    tomorrow = today + timedelta(days=1)
 
     conn = mysql_pool.get_connection()
     cur = conn.cursor(dictionary=True)
@@ -1808,6 +1830,11 @@ def mess_summary():
     ifthaar_count = 0
     athaayam_count = 0
     both_count = 0
+
+    # 🔥 TOMORROW COUNTS
+    t_ifthaar_count = 0
+    t_athaayam_count = 0
+    t_both_count = 0
 
     try:
         # ✅ DELIVERY USERS WITHOUT CUT TODAY
@@ -1830,7 +1857,7 @@ def mess_summary():
         cur.execute(delivery_query, (today,))
         delivery_users = cur.fetchall()
 
-        # ✅ NON DELIVERY COUNT
+        # ✅ NON DELIVERY COUNT (TODAY)
         non_delivery_query = """
             SELECT COUNT(*) AS count
             FROM users u
@@ -1847,8 +1874,8 @@ def mess_summary():
         result = cur.fetchone()
         non_delivery_count = result['count'] if result else 0
 
-        # ✅ MEAL TYPE COUNTS
-        meal_query = """
+        # ✅ MEAL TYPE COUNTS — TODAY
+        meal_query_today = """
             SELECT 
                 u.meal_type,
                 COUNT(*) AS total
@@ -1862,7 +1889,7 @@ def mess_summary():
             GROUP BY u.meal_type
         """
 
-        cur.execute(meal_query, (today,))
+        cur.execute(meal_query_today, (today,))
         meal_results = cur.fetchall()
 
         for row in meal_results:
@@ -1874,6 +1901,37 @@ def mess_summary():
                 athaayam_count = row['total']
             elif meal == 'both':
                 both_count = row['total']
+
+        # ====================================================
+        # 🔥 MEAL TYPE COUNTS — TOMORROW
+        # ====================================================
+
+        meal_query_tomorrow = """
+            SELECT 
+                u.meal_type,
+                COUNT(*) AS total
+            FROM users u
+            WHERE u.approved = 1
+            AND NOT EXISTS (
+                SELECT 1 FROM mess_cut mc
+                WHERE mc.user_id = u.id
+                AND %s BETWEEN mc.start_date AND mc.end_date
+            )
+            GROUP BY u.meal_type
+        """
+
+        cur.execute(meal_query_tomorrow, (tomorrow,))
+        t_meal_results = cur.fetchall()
+
+        for row in t_meal_results:
+            meal = (row['meal_type'] or "").lower()
+
+            if meal == 'ifthaar':
+                t_ifthaar_count = row['total']
+            elif meal == 'athaayam':
+                t_athaayam_count = row['total']
+            elif meal == 'both':
+                t_both_count = row['total']
 
     except Exception as e:
         flash(f"Error loading summary: {e}", "danger")
@@ -1890,8 +1948,15 @@ def mess_summary():
         ifthaar_count=ifthaar_count,
         athaayam_count=athaayam_count,
         both_count=both_count,
-        today=today
+        today=today,
+
+        # 🔥 TOMORROW DATA
+        tomorrow=tomorrow,
+        t_ifthaar_count=t_ifthaar_count,
+        t_athaayam_count=t_athaayam_count,
+        t_both_count=t_both_count
     )
+
 
 
 # ---------------- ADMIN: Validate QR and increment mess_count ----------------
