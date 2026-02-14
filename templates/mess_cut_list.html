@@ -3,90 +3,165 @@
 {% block content %}
 <div class="container mt-4">
 
-    <h2 class="mb-4 text-center text-md-start">Mess Cuts - {{ month_filter }}</h2>
+    <h2 class="mb-4 text-center text-md-start">
+        Mess Cuts — {{ month_filter }}
+    </h2>
 
-    <!-- Total mess cuts for tomorrow -->
-    <p class="mb-3">
-        Total mess cuts for <strong>tomorrow</strong>: 
-        <span class="badge bg-warning text-dark">{{ tomorrow_count }}</span>
-    </p>
+    <!-- 🔥 TOMORROW SUMMARY -->
+    <div class="card p-3 mb-4 shadow-sm">
+        <h5 class="mb-3">Tomorrow Mess Cut Summary</h5>
 
-    <!-- Month filter form -->
+        <div class="row text-center">
+
+            <div class="col-6 col-md-3 mb-2">
+                <div class="summary-box bg-warning text-dark">
+                    <h6>Total</h6>
+                    <span>{{ tomorrow_count }}</span>
+                </div>
+            </div>
+
+            <div class="col-6 col-md-3 mb-2">
+                <div class="summary-box bg-danger">
+                    <h6>Ifthaar</h6>
+                    <span>{{ ifthaar_count }}</span>
+                </div>
+            </div>
+
+            <div class="col-6 col-md-3 mb-2">
+                <div class="summary-box bg-info text-dark">
+                    <h6>Athaayam</h6>
+                    <span>{{ athaayam_count }}</span>
+                </div>
+            </div>
+
+            <div class="col-6 col-md-3 mb-2">
+                <div class="summary-box bg-success">
+                    <h6>Both</h6>
+                    <span>{{ both_count }}</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Month filter -->
     <div class="mb-4">
         <form method="get" class="d-flex gap-2 flex-wrap">
-            <input type="month" name="month" value="{{ month_filter }}" class="form-control" style="max-width:200px;">
-            <button type="submit" class="btn btn-primary btn-custom">Filter</button>
+            <input type="month" name="month" value="{{ month_filter }}"
+                   class="form-control" style="max-width:200px;">
+            <button type="submit" class="btn btn-primary">
+                Filter
+            </button>
         </form>
     </div>
 
-    <!-- Search input -->
+    <!-- Search -->
     <div class="mb-4">
-        <input type="text" id="searchInput" class="form-control rounded-pill" placeholder="Search mess cuts...">
+        <input type="text" id="searchInput"
+               class="form-control rounded-pill"
+               placeholder="Search mess cuts...">
     </div>
 
-    <!-- Mess Cut Cards -->
+    <!-- USER CARDS -->
     <div id="cutsList" class="row g-4">
+
         {% for user_id, user_data in cuts_by_user.items() %}
         <div class="col-12 col-md-6 col-lg-4">
+
             <div class="card custom-card p-3">
+
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <h5 class="mb-0">{{ user_data.name }}</h5>
-                    <span class="badge bg-primary">{{ user_data.course }}</span>
+                    <span class="badge bg-primary">
+                        {{ user_data.course }}
+                    </span>
                 </div>
 
-                <div>
-                    <ul class="list-unstyled mb-2">
-                        {% for r in user_data.ranges %}
-                        <li>
-                            {{ r.start }} → {{ r.end }} 
-                            <span class="badge bg-info">{{ r.days }} days</span>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                </div>
+                <!-- Meal Type -->
+                <p class="mb-2">
+                    Meal Type:
+                    <span class="badge bg-secondary">
+                        {{ user_data.meal_type }}
+                    </span>
+                </p>
+
+                <ul class="list-unstyled mb-2">
+                    {% for r in user_data.ranges %}
+                    <li>
+                        {{ r.start }} → {{ r.end }}
+                        <span class="badge bg-info">
+                            {{ r.days }} days
+                        </span>
+                    </li>
+                    {% endfor %}
+                </ul>
 
                 <div class="text-end">
-                    <span class="badge bg-success">Total: {{ user_data.total_days }} days</span>
+                    <span class="badge bg-success">
+                        Total: {{ user_data.total_days }} days
+                    </span>
                 </div>
+
             </div>
+
         </div>
+
         {% else %}
         <div class="col-12">
-            <p class="text-center">No mess cuts found for this month.</p>
+            <p class="text-center">
+                No mess cuts found for this month.
+            </p>
         </div>
         {% endfor %}
+
     </div>
 </div>
 
-<!-- Styles -->
+<!-- 🔥 STYLES -->
 <style>
+
 .custom-card {
-    background-color: #ffffff;
+    background: #ffffff;
     border-radius: 15px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .custom-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    transform: translateY(-4px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
 }
 
-#searchInput {
-    border-radius: 50px !important;
+.summary-box {
+    padding: 15px;
+    border-radius: 12px;
+    color: white;
+    font-size: 1.3rem;
+    font-weight: bold;
 }
+
+.summary-box h6 {
+    margin-bottom: 5px;
+    font-weight: normal;
+    font-size: 0.9rem;
+}
+
 </style>
 
-<!-- JavaScript for search -->
+<!-- 🔥 SEARCH SCRIPT -->
 <script>
 document.getElementById('searchInput').addEventListener('keyup', function() {
+
     let filter = this.value.toLowerCase();
     let cards = document.querySelectorAll('#cutsList .custom-card');
 
     cards.forEach(card => {
         let text = card.textContent.toLowerCase();
-        card.parentElement.style.display = text.includes(filter) ? '' : 'none';
+        card.parentElement.style.display =
+            text.includes(filter) ? '' : 'none';
     });
+
 });
 </script>
+
 {% endblock %}
