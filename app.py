@@ -6,7 +6,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-import qrcodea
+import qrcode
 import io
 import base64
 from datetime import datetime, time
