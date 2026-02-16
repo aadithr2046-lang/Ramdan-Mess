@@ -1809,8 +1809,6 @@ def users_mess_count():
 
     
 from datetime import date
-from datetime import date, timedelta
-
 @app.route('/admin/mess_summary')
 @login_required
 def mess_summary():
@@ -1826,24 +1824,34 @@ def mess_summary():
     cur = conn.cursor(dictionary=True)
 
     delivery_users = []
-    non_delivery_count = 0
-    ifthaar_count = 0
-    athaayam_count = 0
-    both_count = 0
 
-    # 🔥 TOMORROW COUNTS
-    t_ifthaar_count = 0
-    t_athaayam_count = 0
-    t_both_count = 0
+    # TODAY — Delivery counts
+    delivery_ifthaar_count = 0
+    delivery_athaayam_count = 0
+    delivery_both_count = 0
+
+    # TODAY — Non-delivery counts
+    non_delivery_ifthaar_count = 0
+    non_delivery_athaayam_count = 0
+    non_delivery_both_count = 0
+
+    # TOMORROW — Delivery counts
+    t_delivery_ifthaar_count = 0
+    t_delivery_athaayam_count = 0
+    t_delivery_both_count = 0
+
+    # TOMORROW — Non-delivery counts
+    t_non_delivery_ifthaar_count = 0
+    t_non_delivery_athaayam_count = 0
+    t_non_delivery_both_count = 0
 
     try:
-        # ✅ DELIVERY USERS WITHOUT CUT TODAY
+
+        # ====================================================
+        # ✅ DELIVERY USERS LIST (TODAY)
+        # ====================================================
         delivery_query = """
-            SELECT 
-                u.name,
-                u.phone,
-                u.delivery_address,
-                u.meal_type
+            SELECT name, phone, delivery_address, meal_type
             FROM users u
             WHERE u.approved = 1
             AND u.delivery_enabled = 1
@@ -1853,13 +1861,41 @@ def mess_summary():
                 AND %s BETWEEN mc.start_date AND mc.end_date
             )
         """
-
         cur.execute(delivery_query, (today,))
         delivery_users = cur.fetchall()
 
-        # ✅ NON DELIVERY COUNT (TODAY)
-        non_delivery_query = """
-            SELECT COUNT(*) AS count
+        # ====================================================
+        # ✅ TODAY — DELIVERY MEAL COUNTS
+        # ====================================================
+        delivery_meal_today = """
+            SELECT u.meal_type, COUNT(*) AS total
+            FROM users u
+            WHERE u.approved = 1
+            AND u.delivery_enabled = 1
+            AND NOT EXISTS (
+                SELECT 1 FROM mess_cut mc
+                WHERE mc.user_id = u.id
+                AND %s BETWEEN mc.start_date AND mc.end_date
+            )
+            GROUP BY u.meal_type
+        """
+        cur.execute(delivery_meal_today, (today,))
+        results = cur.fetchall()
+
+        for row in results:
+            meal = (row['meal_type'] or "").lower()
+            if meal == 'ifthaar':
+                delivery_ifthaar_count = row['total']
+            elif meal == 'athaayam':
+                delivery_athaayam_count = row['total']
+            elif meal == 'both':
+                delivery_both_count = row['total']
+
+        # ====================================================
+        # ✅ TODAY — NON-DELIVERY MEAL COUNTS
+        # ====================================================
+        non_delivery_meal_today = """
+            SELECT u.meal_type, COUNT(*) AS total
             FROM users u
             WHERE u.approved = 1
             AND u.delivery_enabled = 0
@@ -1868,19 +1904,28 @@ def mess_summary():
                 WHERE mc.user_id = u.id
                 AND %s BETWEEN mc.start_date AND mc.end_date
             )
+            GROUP BY u.meal_type
         """
+        cur.execute(non_delivery_meal_today, (today,))
+        results = cur.fetchall()
 
-        cur.execute(non_delivery_query, (today,))
-        result = cur.fetchone()
-        non_delivery_count = result['count'] if result else 0
+        for row in results:
+            meal = (row['meal_type'] or "").lower()
+            if meal == 'ifthaar':
+                non_delivery_ifthaar_count = row['total']
+            elif meal == 'athaayam':
+                non_delivery_athaayam_count = row['total']
+            elif meal == 'both':
+                non_delivery_both_count = row['total']
 
-        # ✅ MEAL TYPE COUNTS — TODAY
-        meal_query_today = """
-            SELECT 
-                u.meal_type,
-                COUNT(*) AS total
+        # ====================================================
+        # 🔥 TOMORROW — DELIVERY MEAL COUNTS
+        # ====================================================
+        delivery_meal_tomorrow = """
+            SELECT u.meal_type, COUNT(*) AS total
             FROM users u
             WHERE u.approved = 1
+            AND u.delivery_enabled = 1
             AND NOT EXISTS (
                 SELECT 1 FROM mess_cut mc
                 WHERE mc.user_id = u.id
@@ -1888,30 +1933,26 @@ def mess_summary():
             )
             GROUP BY u.meal_type
         """
+        cur.execute(delivery_meal_tomorrow, (tomorrow,))
+        results = cur.fetchall()
 
-        cur.execute(meal_query_today, (today,))
-        meal_results = cur.fetchall()
-
-        for row in meal_results:
+        for row in results:
             meal = (row['meal_type'] or "").lower()
-
             if meal == 'ifthaar':
-                ifthaar_count = row['total']
+                t_delivery_ifthaar_count = row['total']
             elif meal == 'athaayam':
-                athaayam_count = row['total']
+                t_delivery_athaayam_count = row['total']
             elif meal == 'both':
-                both_count = row['total']
+                t_delivery_both_count = row['total']
 
         # ====================================================
-        # 🔥 MEAL TYPE COUNTS — TOMORROW
+        # 🔥 TOMORROW — NON-DELIVERY MEAL COUNTS
         # ====================================================
-
-        meal_query_tomorrow = """
-            SELECT 
-                u.meal_type,
-                COUNT(*) AS total
+        non_delivery_meal_tomorrow = """
+            SELECT u.meal_type, COUNT(*) AS total
             FROM users u
             WHERE u.approved = 1
+            AND u.delivery_enabled = 0
             AND NOT EXISTS (
                 SELECT 1 FROM mess_cut mc
                 WHERE mc.user_id = u.id
@@ -1919,19 +1960,17 @@ def mess_summary():
             )
             GROUP BY u.meal_type
         """
+        cur.execute(non_delivery_meal_tomorrow, (tomorrow,))
+        results = cur.fetchall()
 
-        cur.execute(meal_query_tomorrow, (tomorrow,))
-        t_meal_results = cur.fetchall()
-
-        for row in t_meal_results:
+        for row in results:
             meal = (row['meal_type'] or "").lower()
-
             if meal == 'ifthaar':
-                t_ifthaar_count = row['total']
+                t_non_delivery_ifthaar_count = row['total']
             elif meal == 'athaayam':
-                t_athaayam_count = row['total']
+                t_non_delivery_athaayam_count = row['total']
             elif meal == 'both':
-                t_both_count = row['total']
+                t_non_delivery_both_count = row['total']
 
     except Exception as e:
         flash(f"Error loading summary: {e}", "danger")
@@ -1944,18 +1983,30 @@ def mess_summary():
     return render_template(
         "mess_summary.html",
         delivery_users=delivery_users,
-        non_delivery_count=non_delivery_count,
-        ifthaar_count=ifthaar_count,
-        athaayam_count=athaayam_count,
-        both_count=both_count,
         today=today,
-
-        # 🔥 TOMORROW DATA
         tomorrow=tomorrow,
-        t_ifthaar_count=t_ifthaar_count,
-        t_athaayam_count=t_athaayam_count,
-        t_both_count=t_both_count
+
+        # TODAY — Delivery
+        delivery_ifthaar_count=delivery_ifthaar_count,
+        delivery_athaayam_count=delivery_athaayam_count,
+        delivery_both_count=delivery_both_count,
+
+        # TODAY — Non Delivery
+        non_delivery_ifthaar_count=non_delivery_ifthaar_count,
+        non_delivery_athaayam_count=non_delivery_athaayam_count,
+        non_delivery_both_count=non_delivery_both_count,
+
+        # TOMORROW — Delivery
+        t_delivery_ifthaar_count=t_delivery_ifthaar_count,
+        t_delivery_athaayam_count=t_delivery_athaayam_count,
+        t_delivery_both_count=t_delivery_both_count,
+
+        # TOMORROW — Non Delivery
+        t_non_delivery_ifthaar_count=t_non_delivery_ifthaar_count,
+        t_non_delivery_athaayam_count=t_non_delivery_athaayam_count,
+        t_non_delivery_both_count=t_non_delivery_both_count
     )
+
 
 
 
