@@ -1824,9 +1824,10 @@ def mess_summary():
     tomorrow = today + timedelta(days=1)
 
     # ====================================
-    # ✅ GET MEAL FILTER (NEW)
+    # ✅ GET FILTERS (NEW)
     # ====================================
     meal_filter = request.args.get("meal_filter", "ifthaar").lower()
+    course_filter = request.args.get("course_filter", "").strip()
 
     if meal_filter == "athaayam":
         allowed_types = ("athaayam", "both")
@@ -1862,14 +1863,25 @@ def mess_summary():
     try:
 
         # ====================================================
-        # ✅ DELIVERY USERS LIST (TODAY) — FILTERED BY MEAL
+        # ✅ DELIVERY USERS LIST — FILTERED BY MEAL + COURSE
         # ====================================================
+
         delivery_query = """
             SELECT name, phone, course, delivery_address, meal_type
             FROM users u
             WHERE u.approved = 1
             AND u.delivery_enabled = 1
             AND u.meal_type IN (%s, %s)
+        """
+
+        params = [allowed_types[0], allowed_types[1]]
+
+        # 👉 Course filter (optional)
+        if course_filter:
+            delivery_query += " AND u.course = %s "
+            params.append(course_filter)
+
+        delivery_query += """
             AND NOT EXISTS (
                 SELECT 1 FROM mess_cut mc
                 WHERE mc.user_id = u.id
@@ -1877,7 +1889,9 @@ def mess_summary():
             )
         """
 
-        cur.execute(delivery_query, (allowed_types[0], allowed_types[1], today))
+        params.append(today)
+
+        cur.execute(delivery_query, params)
         delivery_users = cur.fetchall()
 
         # ====================================================
@@ -1977,7 +1991,8 @@ def mess_summary():
         delivery_users=delivery_users,
         today=today,
         tomorrow=tomorrow,
-        meal_filter=meal_filter,   # ⭐ IMPORTANT
+        meal_filter=meal_filter,
+        course_filter=course_filter,  # ⭐ NEW
 
         # TODAY — Delivery
         delivery_ifthaar_count=delivery_ifthaar_count,
@@ -1999,7 +2014,6 @@ def mess_summary():
         t_non_delivery_athaayam_count=t_non_delivery_athaayam_count,
         t_non_delivery_both_count=t_non_delivery_both_count
     )
-
 
 
 # ---------------- ADMIN: Validate QR and increment mess_count ----------------

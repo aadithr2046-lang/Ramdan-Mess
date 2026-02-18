@@ -69,18 +69,44 @@
 
         <h4 class="card-title mb-3">🚚 Delivery Users (No Cut)</h4>
 
-        <!-- ✅ FILTER FORM -->
+        <!-- ✅ FILTER FORM (MEAL + COURSE) -->
         <form method="GET" class="mb-3">
-            <label class="me-2"><strong>Delivery Time:</strong></label>
 
-            <select name="meal_filter" class="form-select w-auto d-inline">
-                <option value="ifthaar" {% if meal_filter == "ifthaar" %}selected{% endif %}>Ifthaar</option>
-                <option value="athaayam" {% if meal_filter == "athaayam" %}selected{% endif %}>Athaayam</option>
-            </select>
+            <div class="row g-2 align-items-end">
 
-            <button type="submit" class="btn btn-primary btn-sm ms-2">
-                Apply
-            </button>
+                <!-- Meal Filter -->
+                <div class="col-auto">
+                    <label class="form-label"><strong>Delivery Time</strong></label>
+                    <select name="meal_filter" class="form-select">
+                        <option value="ifthaar" {% if meal_filter == "ifthaar" %}selected{% endif %}>Ifthaar</option>
+                        <option value="athaayam" {% if meal_filter == "athaayam" %}selected{% endif %}>Athaayam</option>
+                    </select>
+                </div>
+
+                <!-- Course Filter -->
+                <div class="col-auto">
+                    <label class="form-label"><strong>Course</strong></label>
+                    <input
+                        type="text"
+                        name="course_filter"
+                        value="{{ course_filter }}"
+                        placeholder="Enter course"
+                        class="form-control"
+                    >
+                </div>
+
+                <!-- Buttons -->
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary">
+                        Apply Filters
+                    </button>
+                    <a href="{{ url_for('mess_summary') }}" class="btn btn-secondary">
+                        Reset
+                    </a>
+                </div>
+
+            </div>
+
         </form>
 
         <!-- ✅ CURRENT MODE -->
@@ -90,6 +116,13 @@
                 {{ meal_filter }}
             </span>
             (Includes BOTH)
+
+            {% if course_filter %}
+            — Course:
+            <span class="badge bg-info text-dark">
+                {{ course_filter }}
+            </span>
+            {% endif %}
         </p>
 
         {% if delivery_users %}
@@ -125,7 +158,7 @@
         </p>
 
         {% else %}
-        <p class="text-danger">No delivery users for this time.</p>
+        <p class="text-danger">No delivery users for selected filters.</p>
         {% endif %}
 
     </div>
