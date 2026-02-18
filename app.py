@@ -603,7 +603,7 @@ def apply_mess_cut():
     today = date.today()
     tomorrow = today + timedelta(days=1)
     current_time = datetime.now().time()
-    cutoff_time = datetime.strptime("21:00", "%H:%M").time()  # 10 PM
+    cutoff_time = datetime.strptime("22:00", "%H:%M").time()  # 10 PM
     min_end_date = today + timedelta(days=3)
 
     if request.method == 'POST':
@@ -624,7 +624,7 @@ def apply_mess_cut():
 
         # Cannot apply for tomorrow after 10 PM
         if start_date == tomorrow and current_time >= cutoff_time:
-            flash("Cannot apply mess cut for tomorrow after 9 PM today.", "danger")
+            flash("Cannot apply mess cut for tomorrow after 10 PM today.", "danger")
             return redirect(url_for('apply_mess_cut'))
 
 
@@ -1807,7 +1807,6 @@ def users_mess_count():
         return jsonify({'users': [], 'error': str(e)})
 
 
-    
 @app.route('/admin/mess_summary')
 @login_required
 def mess_summary():
@@ -1823,6 +1822,17 @@ def mess_summary():
     now = datetime.now(IST)
     today = now.date()
     tomorrow = today + timedelta(days=1)
+
+    # ====================================
+    # ✅ GET MEAL FILTER (NEW)
+    # ====================================
+    meal_filter = request.args.get("meal_filter", "ifthaar").lower()
+
+    if meal_filter == "athaayam":
+        allowed_types = ("athaayam", "both")
+    else:
+        meal_filter = "ifthaar"
+        allowed_types = ("ifthaar", "both")
 
     conn = mysql_pool.get_connection()
     cur = conn.cursor(dictionary=True)
@@ -1852,20 +1862,22 @@ def mess_summary():
     try:
 
         # ====================================================
-        # ✅ DELIVERY USERS LIST (TODAY) — WITH COURSE
+        # ✅ DELIVERY USERS LIST (TODAY) — FILTERED BY MEAL
         # ====================================================
         delivery_query = """
             SELECT name, phone, course, delivery_address, meal_type
             FROM users u
             WHERE u.approved = 1
             AND u.delivery_enabled = 1
+            AND u.meal_type IN (%s, %s)
             AND NOT EXISTS (
                 SELECT 1 FROM mess_cut mc
                 WHERE mc.user_id = u.id
                 AND %s BETWEEN mc.start_date AND mc.end_date
             )
         """
-        cur.execute(delivery_query, (today,))
+
+        cur.execute(delivery_query, (allowed_types[0], allowed_types[1], today))
         delivery_users = cur.fetchall()
 
         # ====================================================
@@ -1965,6 +1977,7 @@ def mess_summary():
         delivery_users=delivery_users,
         today=today,
         tomorrow=tomorrow,
+        meal_filter=meal_filter,   # ⭐ IMPORTANT
 
         # TODAY — Delivery
         delivery_ifthaar_count=delivery_ifthaar_count,
@@ -1986,7 +1999,6 @@ def mess_summary():
         t_non_delivery_athaayam_count=t_non_delivery_athaayam_count,
         t_non_delivery_both_count=t_non_delivery_both_count
     )
-
 
 
 

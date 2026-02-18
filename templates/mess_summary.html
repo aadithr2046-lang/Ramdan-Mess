@@ -62,19 +62,45 @@
 </div>
 
 
-<!-- ===== DELIVERY USERS TABLE ===== -->
+<!-- ================= DELIVERY USERS ================= -->
+
 <div class="card mb-5 shadow-sm">
     <div class="card-body">
+
         <h4 class="card-title mb-3">🚚 Delivery Users (No Cut)</h4>
 
+        <!-- ✅ FILTER FORM -->
+        <form method="GET" class="mb-3">
+            <label class="me-2"><strong>Delivery Time:</strong></label>
+
+            <select name="meal_filter" class="form-select w-auto d-inline">
+                <option value="ifthaar" {% if meal_filter == "ifthaar" %}selected{% endif %}>Ifthaar</option>
+                <option value="athaayam" {% if meal_filter == "athaayam" %}selected{% endif %}>Athaayam</option>
+            </select>
+
+            <button type="submit" class="btn btn-primary btn-sm ms-2">
+                Apply
+            </button>
+        </form>
+
+        <!-- ✅ CURRENT MODE -->
+        <p>
+            Showing delivery list for:
+            <span class="badge bg-success text-uppercase">
+                {{ meal_filter }}
+            </span>
+            (Includes BOTH)
+        </p>
+
         {% if delivery_users %}
+
         <div class="table-responsive">
             <table class="table table-bordered table-striped">
                 <thead class="table-primary">
                     <tr>
                         <th>Name</th>
                         <th>Phone</th>
-                        <th>Course</th> <!-- ✅ Added -->
+                        <th>Course</th>
                         <th>Address</th>
                         <th>Meal Type</th>
                     </tr>
@@ -84,9 +110,9 @@
                     <tr>
                         <td>{{ user.name }}</td>
                         <td>{{ user.phone }}</td>
-                        <td>{{ user.course }}</td> <!-- ✅ Added -->
+                        <td>{{ user.course }}</td>
                         <td>{{ user.delivery_address }}</td>
-                        <td>{{ user.meal_type }}</td>
+                        <td class="text-capitalize">{{ user.meal_type }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -99,8 +125,9 @@
         </p>
 
         {% else %}
-        <p>No delivery users today.</p>
+        <p class="text-danger">No delivery users for this time.</p>
         {% endif %}
+
     </div>
 </div>
 
