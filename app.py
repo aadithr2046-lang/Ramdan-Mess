@@ -1808,7 +1808,6 @@ def users_mess_count():
 
 
     
-from datetime import date
 @app.route('/admin/mess_summary')
 @login_required
 def mess_summary():
@@ -1817,7 +1816,12 @@ def mess_summary():
         flash("Unauthorized!", "danger")
         return redirect(url_for('index'))
 
-    today = date.today()
+    # ===============================
+    # ✅ FORCE INDIAN TIMEZONE (IST)
+    # ===============================
+    IST = pytz.timezone('Asia/Kolkata')
+    now = datetime.now(IST)
+    today = now.date()
     tomorrow = today + timedelta(days=1)
 
     conn = mysql_pool.get_connection()
@@ -1848,10 +1852,10 @@ def mess_summary():
     try:
 
         # ====================================================
-        # ✅ DELIVERY USERS LIST (TODAY)
+        # ✅ DELIVERY USERS LIST (TODAY) — WITH COURSE
         # ====================================================
         delivery_query = """
-            SELECT name, phone, delivery_address, meal_type
+            SELECT name, phone, course, delivery_address, meal_type
             FROM users u
             WHERE u.approved = 1
             AND u.delivery_enabled = 1
@@ -1921,19 +1925,7 @@ def mess_summary():
         # ====================================================
         # 🔥 TOMORROW — DELIVERY MEAL COUNTS
         # ====================================================
-        delivery_meal_tomorrow = """
-            SELECT u.meal_type, COUNT(*) AS total
-            FROM users u
-            WHERE u.approved = 1
-            AND u.delivery_enabled = 1
-            AND NOT EXISTS (
-                SELECT 1 FROM mess_cut mc
-                WHERE mc.user_id = u.id
-                AND %s BETWEEN mc.start_date AND mc.end_date
-            )
-            GROUP BY u.meal_type
-        """
-        cur.execute(delivery_meal_tomorrow, (tomorrow,))
+        cur.execute(delivery_meal_today, (tomorrow,))
         results = cur.fetchall()
 
         for row in results:
@@ -1948,19 +1940,7 @@ def mess_summary():
         # ====================================================
         # 🔥 TOMORROW — NON-DELIVERY MEAL COUNTS
         # ====================================================
-        non_delivery_meal_tomorrow = """
-            SELECT u.meal_type, COUNT(*) AS total
-            FROM users u
-            WHERE u.approved = 1
-            AND u.delivery_enabled = 0
-            AND NOT EXISTS (
-                SELECT 1 FROM mess_cut mc
-                WHERE mc.user_id = u.id
-                AND %s BETWEEN mc.start_date AND mc.end_date
-            )
-            GROUP BY u.meal_type
-        """
-        cur.execute(non_delivery_meal_tomorrow, (tomorrow,))
+        cur.execute(non_delivery_meal_today, (tomorrow,))
         results = cur.fetchall()
 
         for row in results:
