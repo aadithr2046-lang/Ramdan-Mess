@@ -157,7 +157,7 @@
       let minStartDate = new Date();
 
       // 🔹 10 PM rule (unchanged)
-      if (now.getHours() >= 22) {
+      if (now.getHours() >= 21) {
         minStartDate.setDate(now.getDate() + 2);
       } else {
         minStartDate.setDate(now.getDate() + 1);
