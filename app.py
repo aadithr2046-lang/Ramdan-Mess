@@ -603,7 +603,7 @@ def apply_mess_cut():
     today = date.today()
     tomorrow = today + timedelta(days=1)
     current_time = datetime.now().time()
-    cutoff_time = datetime.strptime("23:00", "%H:%M").time()  # 10 PM
+    cutoff_time = datetime.strptime("21:00", "%H:%M").time()  # 10 PM
     min_end_date = today + timedelta(days=3)
 
     if request.method == 'POST':
@@ -624,7 +624,7 @@ def apply_mess_cut():
 
         # Cannot apply for tomorrow after 10 PM
         if start_date == tomorrow and current_time >= cutoff_time:
-            flash("Cannot apply mess cut for tomorrow after 11 PM today.", "danger")
+            flash("Cannot apply mess cut for tomorrow after 9 PM today.", "danger")
             return redirect(url_for('apply_mess_cut'))
 
 
