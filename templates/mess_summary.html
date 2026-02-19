@@ -62,72 +62,18 @@
 </div>
 
 
-<!-- ================= DELIVERY USERS ================= -->
-
+<!-- ===== DELIVERY USERS TABLE ===== -->
 <div class="card mb-5 shadow-sm">
     <div class="card-body">
-
         <h4 class="card-title mb-3">🚚 Delivery Users (No Cut)</h4>
 
-        <!-- FILTER FORM -->
-        <form method="GET" class="mb-3">
-            <div class="row g-2 align-items-end">
-
-                <div class="col-auto">
-                    <label class="form-label"><strong>Delivery Time</strong></label>
-                    <select name="meal_filter" class="form-select">
-                        <option value="ifthaar" {% if meal_filter == "ifthaar" %}selected{% endif %}>Ifthaar</option>
-                        <option value="athaayam" {% if meal_filter == "athaayam" %}selected{% endif %}>Athaayam</option>
-                    </select>
-                </div>
-
-                <div class="col-auto">
-                    <label class="form-label"><strong>Course</strong></label>
-                    <input
-                        type="text"
-                        name="course_filter"
-                        value="{{ course_filter }}"
-                        placeholder="Enter course"
-                        class="form-control"
-                    >
-                </div>
-
-                <div class="col-auto">
-                    <button type="submit" class="btn btn-primary">
-                        Apply Filters
-                    </button>
-                    <a href="{{ url_for('mess_summary') }}" class="btn btn-secondary">
-                        Reset
-                    </a>
-                </div>
-
-            </div>
-        </form>
-
-        <p>
-            Showing delivery list for:
-            <span class="badge bg-success text-uppercase">
-                {{ meal_filter }}
-            </span>
-            (Includes BOTH)
-
-            {% if course_filter %}
-            — Course:
-            <span class="badge bg-info text-dark">
-                {{ course_filter }}
-            </span>
-            {% endif %}
-        </p>
-
         {% if delivery_users %}
-
         <div class="table-responsive">
             <table class="table table-bordered table-striped">
                 <thead class="table-primary">
                     <tr>
                         <th>Name</th>
                         <th>Phone</th>
-                        <th>Course</th>
                         <th>Address</th>
                         <th>Meal Type</th>
                     </tr>
@@ -137,9 +83,8 @@
                     <tr>
                         <td>{{ user.name }}</td>
                         <td>{{ user.phone }}</td>
-                        <td>{{ user.course }}</td>
                         <td>{{ user.delivery_address }}</td>
-                        <td class="text-capitalize">{{ user.meal_type }}</td>
+                        <td>{{ user.meal_type }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -152,22 +97,15 @@
         </p>
 
         {% else %}
-        <p class="text-danger">No delivery users for selected filters.</p>
+        <p>No delivery users today.</p>
         {% endif %}
-
     </div>
 </div>
 
 
 <!-- ================= TOMORROW ================= -->
 
-<h2 class="mb-3">📅 Tomorrow's Meal Requirement ({{ tomorrow }})</h2>
-
-<!-- ⭐ DOWNLOAD BUTTON ADDED HERE ⭐ -->
-<a href="{{ url_for('download_tomorrow_excel') }}"
-   class="btn btn-success mb-4">
-   📥 Download Tomorrow Mess List (Excel)
-</a>
+<h2 class="mb-4">📅 Tomorrow's Meal Requirement ({{ tomorrow }})</h2>
 
 
 <!-- ===== TOMORROW DELIVERY ===== -->
