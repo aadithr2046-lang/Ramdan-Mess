@@ -1818,10 +1818,6 @@ def mess_summary():
     # ===============================
     # ✅ FORCE INDIAN TIMEZONE (IST)
     # ===============================
-    IST = pytz.timezone('Asia/Kolkata')
-    now = datetime.now(IST)
-    today = now.date()
-    tomorrow = today + timedelta(days=1)
 
     # ====================================
     # ✅ GET FILTERS (NEW)
