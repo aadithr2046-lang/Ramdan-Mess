@@ -33,11 +33,11 @@ mysql_pool = pooling.MySQLConnectionPool(
     pool_name="mypool",
     pool_size=5,
     pool_reset_session=True,
-    host="crossover.proxy.rlwy.net",  # ✅ RDS endpoint
+    host="interchange.proxy.rlwy.net",  # ✅ RDS endpoint
     database="mess_app",
-    port = 49778 , #  ✅ your database name
+    port = 34544 , #  ✅ your database name
     user="root",          # ✅ your RDS username
-    password="frULzuRlbJLmQMaWjpNeFheBmFlTLefo"   # ✅ your RDS password
+    password="hkYcYFdpVHdFCsfSlEVQlRdfQACFuAim"   # ✅ your RDS password
 )
 
 
